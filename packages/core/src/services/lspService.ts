@@ -838,7 +838,19 @@ export class LSPService {
                 );
                 break;
               case 'delete':
-                await fsPromisesLocal.unlink(new URL(change.uri).pathname);
+                try {
+                  await fsPromisesLocal.unlink(new URL(change.uri).pathname);
+                } catch (err: unknown) {
+                  if (
+                    isObject(err) &&
+                    hasProperty(err, 'code') &&
+                    err.code === 'ENOENT'
+                  ) {
+                    // Ignored: File already deleted or doesn't exist
+                  } else {
+                    throw err;
+                  }
+                }
                 break;
               default:
                 debugLogger.warn(
