@@ -11,6 +11,10 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  LSP_DEFINITION_TOOL_NAME,
+  LSP_REFERENCES_TOOL_NAME,
+  LSP_SYMBOLS_TOOL_NAME,
+  LSP_IMPLEMENTATION_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import { makeFakeConfig } from '../test-utils/config.js';
@@ -50,6 +54,10 @@ describe('CodebaseInvestigatorAgent', () => {
       READ_FILE_TOOL_NAME,
       GLOB_TOOL_NAME,
       GREP_TOOL_NAME,
+      LSP_DEFINITION_TOOL_NAME,
+      LSP_REFERENCES_TOOL_NAME,
+      LSP_SYMBOLS_TOOL_NAME,
+      LSP_IMPLEMENTATION_TOOL_NAME,
     ]);
   });
 

@@ -1,0 +1,3 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"lsp_symbols","args":{"file_path":"mockRename.ts"}}}]},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"lsp_rename","args":{"file_path":"mockRename.ts", "line": 1, "character": 15, "new_name": "NewClassName"}}}]},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Renamed OldClassName to NewClassName."}]},"finishReason":"STOP","index":0}]}]}

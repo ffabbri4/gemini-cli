@@ -84,6 +84,12 @@ import {
   LSP_REFERENCES_DEFINITION,
   LSP_SYMBOLS_DEFINITION,
   LSP_IMPLEMENTATION_DEFINITION,
+  LSP_GLOBAL_SYMBOLS_DEFINITION,
+  LSP_TYPE_DEFINITION_DEFINITION,
+  LSP_HOVER_DEFINITION,
+  LSP_RENAME_DEFINITION,
+  LSP_FIX_DEFINITION,
+  LSP_CAPABILITIES_DEFINITION,
 } from '../lspTools.js';
 
 export const DEFAULT_LEGACY_SET: CoreToolSet = {
@@ -744,4 +750,10 @@ The agent did not use the todo list because this task could be completed by a ti
   lsp_references: LSP_REFERENCES_DEFINITION.base,
   lsp_symbols: LSP_SYMBOLS_DEFINITION.base,
   lsp_implementation: LSP_IMPLEMENTATION_DEFINITION.base,
+  lsp_global_symbols: LSP_GLOBAL_SYMBOLS_DEFINITION.base,
+  lsp_type_definition: LSP_TYPE_DEFINITION_DEFINITION.base,
+  lsp_hover: LSP_HOVER_DEFINITION.base,
+  lsp_rename: LSP_RENAME_DEFINITION.base,
+  lsp_fix: LSP_FIX_DEFINITION.base,
+  lsp_capabilities: LSP_CAPABILITIES_DEFINITION.base,
 };

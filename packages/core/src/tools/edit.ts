@@ -57,6 +57,7 @@ import levenshtein from 'fast-levenshtein';
 import { EDIT_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
+import { coreEvents } from '../utils/events.js';
 
 const ENABLE_FUZZY_MATCH_RECOVERY = true;
 const FUZZY_MATCH_THRESHOLD = 0.1; // Allow up to 10% weighted difference
@@ -878,6 +879,8 @@ class EditToolInvocation
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
+
+      coreEvents.emitLSPFileSaved(this.params.file_path);
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {

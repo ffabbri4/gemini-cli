@@ -5,6 +5,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -18,8 +19,10 @@ import type {
   InitializeResult,
   Position,
   Range,
+  ServerCapabilities,
 } from 'vscode-languageserver-protocol';
 import { debugLogger } from '../utils/debugLogger.js';
+import { CoreEvent, coreEvents } from '../utils/events.js';
 
 /**
  * Native position representation (1-indexed).
@@ -40,35 +43,342 @@ export interface LSPLocation {
   };
 }
 
-interface LSPRequestParams {
+/**
+ * A single text edit.
+ */
+export interface LSPTextEdit {
+  start: LSPPosition;
+  end: LSPPosition;
+  newText: string;
+}
+
+/**
+ * Simplified WorkspaceEdit for tool output.
+ */
+export interface LSPWorkspaceEdit {
+  changes?: Record<string, LSPTextEdit[]>;
+  documentChanges?: Array<
+    | {
+        textDocument: { uri: string; version: number | null };
+        edits: LSPTextEdit[];
+      }
+    | { kind: 'create'; uri: string }
+    | { kind: 'rename'; oldUri: string; newUri: string }
+    | { kind: 'delete'; uri: string }
+  >;
+}
+
+/**
+ * Protocol-specific types for parsing raw JSON-RPC responses.
+ */
+interface ProtocolPosition {
+  line: number;
+  character: number;
+}
+
+interface ProtocolRange {
+  start: ProtocolPosition;
+  end: ProtocolPosition;
+}
+
+interface ProtocolTextEdit {
+  range: ProtocolRange;
+  newText: string;
+}
+
+interface ProtocolTextDocumentIdentifier {
+  uri: string;
+  version: number | null;
+}
+
+interface ProtocolTextDocumentEdit {
+  textDocument: ProtocolTextDocumentIdentifier;
+  edits: ProtocolTextEdit[];
+}
+
+interface ProtocolFileOperation {
+  kind: 'create' | 'rename' | 'delete';
+  uri?: string;
+  oldUri?: string;
+  newUri?: string;
+}
+
+interface ProtocolWorkspaceEdit {
+  changes?: Record<string, ProtocolTextEdit[]>;
+  documentChanges?: Array<ProtocolTextDocumentEdit | ProtocolFileOperation>;
+}
+
+/**
+ * Safe property existence check to satisfy no-restricted-syntax.
+ */
+function hasProperty<T extends string>(
+  obj: object,
+  prop: T,
+): obj is { [K in T]: unknown } {
+  return prop in obj;
+}
+
+/**
+ * Type guard for ProtocolTextDocumentEdit.
+ */
+function isProtocolTextDocumentEdit(
+  dc: object,
+): dc is ProtocolTextDocumentEdit {
+  return (
+    hasProperty(dc, 'textDocument') &&
+    hasProperty(dc, 'edits') &&
+    Array.isArray(dc['edits'])
+  );
+}
+
+/**
+ * Type guard for ProtocolFileOperation.
+ */
+function isProtocolFileOperation(dc: object): dc is ProtocolFileOperation {
+  if (!hasProperty(dc, 'kind')) return false;
+  const kind = dc['kind'];
+  return (
+    typeof kind === 'string' &&
+    ['create', 'rename', 'delete'].includes(kind) &&
+    (hasProperty(dc, 'uri') ||
+      (hasProperty(dc, 'oldUri') && hasProperty(dc, 'newUri')))
+  );
+}
+
+/**
+ * Type guard for LSPWorkspaceEdit.
+ */
+export function isLSPWorkspaceEdit(val: unknown): val is LSPWorkspaceEdit {
+  if (!isObject(val)) return false;
+  return hasProperty(val, 'changes') || hasProperty(val, 'documentChanges');
+}
+
+export interface LSPRequestParams {
   position?: Position;
   textDocument?: { uri: string };
   [key: string]: unknown;
 }
 
-interface ServerInstance {
+export interface ServerInstance {
   process: ChildProcess;
   connection: MessageConnection;
+  capabilities?: ServerCapabilities;
 }
 
-function isObject(val: unknown): val is Record<string, unknown> {
+export function isObject(val: unknown): val is Record<string, unknown> {
   return typeof val === 'object' && val !== null;
 }
 
-function isLSPPosition(val: unknown): val is Position {
-  if (!isObject(val)) return false;
-  return typeof val.line === 'number' && typeof val.character === 'number';
+function isNumber(val: unknown): val is number {
+  return typeof val === 'number';
 }
 
-function isLSPRange(val: unknown): val is Range {
+export function isLSPPosition(val: unknown): val is Position {
   if (!isObject(val)) return false;
-  return isLSPPosition(val.start) && isLSPPosition(val.end);
+  const line = val['line'];
+  const character = val['character'];
+  return isNumber(line) && isNumber(character);
+}
+export function isLSPRange(val: unknown): val is Range {
+  if (!isObject(val)) return false;
+  const start = val['start'];
+  const end = val['end'];
+  return isLSPPosition(start) && isLSPPosition(end);
 }
 
-function isLSPRequestParams(params: unknown): params is LSPRequestParams {
-  if (!isObject(params)) return false;
-  if ('position' in params && !isLSPPosition(params.position)) return false;
-  return true;
+/**
+ * Normalizes parameters by converting 1-indexed positions to 0-indexed.
+ * Pure function returning a new object. Recursively handles objects and arrays.
+ */
+export function normalizeLSPParams(params: unknown): unknown {
+  if (Array.isArray(params)) {
+    return params.map(normalizeLSPParams);
+  }
+
+  if (isObject(params)) {
+    if (isLSPPosition(params)) {
+      return {
+        line: params.line - 1,
+        character: params.character - 1,
+      };
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(params)) {
+      result[key] = normalizeLSPParams(value);
+    }
+    return result;
+  }
+
+  return params;
+}
+
+export function normalizeWorkspaceEdit(edit: LSPWorkspaceEdit): unknown {
+  const result: Record<string, unknown> = {};
+
+  if (edit.changes) {
+    const changes: Record<string, unknown[]> = {};
+    for (const [uri, edits] of Object.entries(edit.changes)) {
+      changes[uri] = edits.map((e) => ({
+        ...e,
+        range: {
+          start: { line: e.start.line - 1, character: e.start.character - 1 },
+          end: { line: e.end.line - 1, character: e.end.character - 1 },
+        },
+      }));
+    }
+    result['changes'] = changes;
+  }
+
+  if (edit.documentChanges) {
+    result['documentChanges'] = edit.documentChanges.map((dc) => {
+      if ('edits' in dc) {
+        return {
+          ...dc,
+          edits: dc.edits.map((e) => ({
+            ...e,
+            range: {
+              start: {
+                line: e.start.line - 1,
+                character: e.start.character - 1,
+              },
+              end: { line: e.end.line - 1, character: e.end.character - 1 },
+            },
+          })),
+        };
+      }
+      return dc;
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Recursively denormalizes LSP results from 0-indexed to 1-indexed coordinates.
+ * Pure function leveraging immutable updates.
+ */
+export function denormalizeLSPResult(result: unknown): unknown {
+  if (!result) return result;
+
+  if (Array.isArray(result)) {
+    return result.map(denormalizeLSPResult);
+  }
+
+  if (isObject(result)) {
+    let res: Record<string, unknown> = { ...result };
+
+    if (isLSPRange(result)) {
+      res = {
+        ...res,
+        start: {
+          line: result.start.line + 1,
+          character: result.start.character + 1,
+        },
+        end: {
+          line: result.end.line + 1,
+          character: result.end.character + 1,
+        },
+      };
+    }
+
+    const keysToNormalize = [
+      'location',
+      'range',
+      'selectionRange',
+      'children',
+      'targetRange',
+      'targetSelectionRange',
+      'originSelectionRange',
+    ];
+    for (const key of keysToNormalize) {
+      const val = res[key];
+      if (val !== undefined) {
+        res[key] = denormalizeLSPResult(val);
+      }
+    }
+
+    // Special handling for WorkspaceEdit
+    if (hasProperty(res, 'changes') || hasProperty(res, 'documentChanges')) {
+      return denormalizeWorkspaceEdit(result);
+    }
+
+    return res;
+  }
+
+  return result;
+}
+
+function denormalizeWorkspaceEdit(edit: unknown): LSPWorkspaceEdit {
+  const result: LSPWorkspaceEdit = {};
+  if (!isObject(edit)) return result;
+
+  const protocolEdit = edit as ProtocolWorkspaceEdit;
+
+  if (protocolEdit.changes) {
+    result.changes = {};
+    for (const [uri, edits] of Object.entries(protocolEdit.changes)) {
+      if (Array.isArray(edits)) {
+        result.changes[uri] = edits.map((e) => ({
+          newText: e.newText,
+          start: {
+            line: e.range.start.line + 1,
+            character: e.range.start.character + 1,
+          },
+          end: {
+            line: e.range.end.line + 1,
+            character: e.range.end.character + 1,
+          },
+        }));
+      }
+    }
+  }
+
+  if (protocolEdit.documentChanges) {
+    const documentChanges: Array<
+      | {
+          textDocument: { uri: string; version: number | null };
+          edits: LSPTextEdit[];
+        }
+      | { kind: 'create'; uri: string }
+      | { kind: 'rename'; oldUri: string; newUri: string }
+      | { kind: 'delete'; uri: string }
+    > = [];
+
+    for (const dc of protocolEdit.documentChanges) {
+      if (isProtocolTextDocumentEdit(dc)) {
+        documentChanges.push({
+          textDocument: dc.textDocument,
+          edits: dc.edits.map((e) => ({
+            newText: e.newText,
+            start: {
+              line: e.range.start.line + 1,
+              character: e.range.start.character + 1,
+            },
+            end: {
+              line: e.range.end.line + 1,
+              character: e.range.end.character + 1,
+            },
+          })),
+        });
+      } else if (isProtocolFileOperation(dc)) {
+        if (dc.kind === 'create' && dc.uri) {
+          documentChanges.push({ kind: dc.kind, uri: dc.uri });
+        } else if (dc.kind === 'rename' && dc.oldUri && dc.newUri) {
+          documentChanges.push({
+            kind: dc.kind,
+            oldUri: dc.oldUri,
+            newUri: dc.newUri,
+          });
+        } else if (dc.kind === 'delete' && dc.uri) {
+          documentChanges.push({ kind: dc.kind, uri: dc.uri });
+        }
+      }
+    }
+    result.documentChanges = documentChanges;
+  }
+
+  return result;
 }
 
 /**
@@ -82,6 +392,7 @@ export class LSPService {
     string,
     Promise<MessageConnection>
   >();
+  private readonly openedFiles = new Map<string, number>();
 
   // Mapping of extensions to default language server commands
   private readonly languageToCommand: Record<string, string[]> = {
@@ -96,6 +407,32 @@ export class LSPService {
     // Ensure cleanup on main process exit
     process.on('exit', () => {
       void this.shutdown();
+    });
+
+    // Subscribe to file system events to keep LSP servers in sync
+    coreEvents.on(CoreEvent.LSPFileChanged, (payload) => {
+      // Find which project root this file belongs to
+      for (const [key] of this.servers) {
+        const [projectRoot] = key.split(':');
+        if (payload.filePath.startsWith(projectRoot)) {
+          void this.notifyFileChanged(
+            projectRoot,
+            payload.filePath,
+            payload.content,
+          );
+          break;
+        }
+      }
+    });
+
+    coreEvents.on(CoreEvent.LSPFileSaved, (payload) => {
+      for (const [key] of this.servers) {
+        const [projectRoot] = key.split(':');
+        if (payload.filePath.startsWith(projectRoot)) {
+          void this.notifyFileSaved(projectRoot, payload.filePath);
+          break;
+        }
+      }
     });
   }
 
@@ -206,12 +543,24 @@ export class LSPService {
       processId: process.pid,
       rootUri,
       capabilities: {
+        workspace: {
+          workspaceEdit: { documentChanges: true },
+          symbol: { dynamicRegistration: true },
+        },
         textDocument: {
           definition: { dynamicRegistration: true },
           references: { dynamicRegistration: true },
           implementation: { dynamicRegistration: true },
+          typeDefinition: { dynamicRegistration: true },
+          hover: { dynamicRegistration: true },
+          rename: { dynamicRegistration: true },
+          codeAction: { dynamicRegistration: true },
           documentSymbol: {
             hierarchicalDocumentSymbolSupport: true,
+          },
+          synchronization: {
+            didSave: true,
+            dynamicRegistration: true,
           },
         },
       },
@@ -234,11 +583,102 @@ export class LSPService {
       );
       await connection.sendNotification('initialized', {});
 
-      this.servers.set(key, { process: childProcess, connection });
+      this.servers.set(key, {
+        process: childProcess,
+        connection,
+        capabilities: result.capabilities,
+      });
       return connection;
     } catch (error) {
       childProcess.kill();
       throw new Error(`Failed to initialize LSP server: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Returns the server capabilities for a given project and file.
+   */
+  async getCapabilities(
+    projectRoot: string,
+    filePath: string,
+  ): Promise<ServerCapabilities> {
+    const languageId = this.getLanguageId(filePath);
+    if (!languageId) {
+      throw new Error(
+        `Unsupported file type for LSP: ${path.extname(filePath)}`,
+      );
+    }
+    const key = `${projectRoot}:${languageId}`;
+    let server = this.servers.get(key);
+    if (!server) {
+      await this.getOrCreateConnection(projectRoot, languageId);
+      server = this.servers.get(key);
+    }
+    if (!server?.capabilities) {
+      throw new Error(`Capabilities not available for server: ${languageId}`);
+    }
+    return server.capabilities;
+  }
+
+  /**
+   * Notifies the server that a file's content has changed in memory.
+   */
+  async notifyFileChanged(
+    projectRoot: string,
+    filePath: string,
+    content: string,
+  ): Promise<void> {
+    const languageId = this.getLanguageId(filePath);
+    if (!languageId) return;
+
+    const connection = await this.getOrCreateConnection(
+      projectRoot,
+      languageId,
+    );
+    const fileUri = pathToFileURL(filePath).toString();
+
+    const currentVersion = this.openedFiles.get(fileUri);
+
+    if (currentVersion === undefined) {
+      await connection.sendNotification('textDocument/didOpen', {
+        textDocument: {
+          uri: fileUri,
+          languageId,
+          version: 1,
+          text: content,
+        },
+      });
+      this.openedFiles.set(fileUri, 1);
+    } else {
+      const nextVersion = currentVersion + 1;
+      await connection.sendNotification('textDocument/didChange', {
+        textDocument: {
+          uri: fileUri,
+          version: nextVersion,
+        },
+        contentChanges: [{ text: content }],
+      });
+      this.openedFiles.set(fileUri, nextVersion);
+    }
+  }
+
+  /**
+   * Notifies the server that a file has been saved to disk.
+   */
+  async notifyFileSaved(projectRoot: string, filePath: string): Promise<void> {
+    const languageId = this.getLanguageId(filePath);
+    if (!languageId) return;
+
+    const connection = await this.getOrCreateConnection(
+      projectRoot,
+      languageId,
+    );
+    const fileUri = pathToFileURL(filePath).toString();
+
+    if (this.openedFiles.has(fileUri)) {
+      await connection.sendNotification('textDocument/didSave', {
+        textDocument: { uri: fileUri },
+      });
     }
   }
 
@@ -263,71 +703,127 @@ export class LSPService {
       languageId,
     );
 
-    // Normalize coordinates if present in params (1-indexed -> 0-indexed)
-    let lspParams = params;
-    if (isLSPRequestParams(params) && params.position) {
-      lspParams = {
-        ...params,
-        position: {
-          line: params.position.line - 1,
-          character: params.position.character - 1,
-        },
-      };
+    // Ensure the file is "opened" on the server
+    const fileUri = pathToFileURL(filePath).toString();
+    if (!this.openedFiles.has(fileUri)) {
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        await connection.sendNotification('textDocument/didOpen', {
+          textDocument: {
+            uri: fileUri,
+            languageId,
+            version: 1,
+            text: content,
+          },
+        });
+        this.openedFiles.set(fileUri, 1);
+      } catch (error) {
+        debugLogger.error(`Failed to send didOpen for ${filePath}:`, error);
+      }
     }
 
+    const lspParams = normalizeLSPParams(params);
     const result = await connection.sendRequest(method, lspParams);
 
-    // Denormalize coordinates in result (0-indexed -> 1-indexed)
-    return this.normalizeResult(result);
+    return denormalizeLSPResult(result);
   }
 
   /**
-   * Recursively normalizes coordinates in LSP results from 0-indexed to 1-indexed.
+   * Applies a WorkspaceEdit across multiple files.
    */
-  private normalizeResult(result: unknown): unknown {
-    if (!result) return result;
-
-    if (Array.isArray(result)) {
-      const list: unknown[] = [];
-      for (const item of result) {
-        list.push(this.normalizeResult(item));
-      }
-      return list;
-    }
-
-    if (isObject(result)) {
-      const res: Record<string, unknown> = { ...result };
-
-      // Handle Range (start, end)
-      if (isLSPRange(result)) {
-        res.start = {
-          line: result.start.line + 1,
-          character: result.start.character + 1,
-        };
-        res.end = {
-          line: result.end.line + 1,
-          character: result.end.character + 1,
-        };
-      }
-
-      // Handle properties that might contain Locations or Ranges recursively
-      const keysToNormalize = [
-        'location',
-        'range',
-        'selectionRange',
-        'children',
-      ];
-      for (const key of keysToNormalize) {
-        const val = res[key];
-        if (val) {
-          res[key] = this.normalizeResult(val);
+  async applyWorkspaceEdit(
+    projectRoot: string,
+    edit: LSPWorkspaceEdit,
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // 1. Apply 'changes' (Record<string, TextEdit[]>)
+      if (edit.changes) {
+        for (const [fileUri, edits] of Object.entries(edit.changes)) {
+          const filePath = new URL(fileUri).pathname;
+          await this.applyEditsToFile(filePath, edits);
         }
       }
 
-      return res;
+      // 2. Apply 'documentChanges'
+      if (edit.documentChanges) {
+        for (const change of edit.documentChanges) {
+          if ('textDocument' in change && 'edits' in change) {
+            const filePath = new URL(change.textDocument.uri).pathname;
+            await this.applyEditsToFile(filePath, change.edits);
+          } else if ('kind' in change) {
+            // Handle create, rename, delete
+            const fsPromisesLocal = await import('node:fs/promises');
+            switch (change.kind) {
+              case 'create':
+                await fsPromisesLocal.writeFile(
+                  new URL(change.uri).pathname,
+                  '',
+                );
+                break;
+              case 'rename':
+                await fsPromisesLocal.rename(
+                  new URL(change.oldUri).pathname,
+                  new URL(change.newUri).pathname,
+                );
+                break;
+              case 'delete':
+                await fsPromisesLocal.unlink(new URL(change.uri).pathname);
+                break;
+              default:
+                debugLogger.warn(
+                  `Unknown document change kind: ${JSON.stringify(change)}`,
+                );
+            }
+          }
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  }
+
+  private async applyEditsToFile(
+    filePath: string,
+    edits: LSPTextEdit[],
+  ): Promise<void> {
+    const fsPromisesLocal = await import('node:fs/promises');
+    let content = await fsPromisesLocal.readFile(filePath, 'utf-8');
+
+    // Sort edits in reverse order to maintain index validity
+    const sortedEdits = [...edits].sort((a, b) => {
+      if (a.start.line !== b.start.line) return b.start.line - a.start.line;
+      return b.start.character - a.start.character;
+    });
+
+    const lines = content.split('\n');
+
+    for (const edit of sortedEdits) {
+      const startLine = edit.start.line - 1;
+      const startChar = edit.start.character - 1;
+      const endLine = edit.end.line - 1;
+      const endChar = edit.end.character - 1;
+
+      if (startLine === endLine) {
+        const line = lines[startLine];
+        lines[startLine] =
+          line.substring(0, startChar) + edit.newText + line.substring(endChar);
+      } else {
+        const firstLine = lines[startLine].substring(0, startChar);
+        const lastLine = lines[endLine].substring(endChar);
+        lines.splice(
+          startLine,
+          endLine - startLine + 1,
+          firstLine + edit.newText + lastLine,
+        );
+      }
     }
 
-    return result;
+    content = lines.join('\n');
+    await fsPromisesLocal.writeFile(filePath, content);
+    // Notify server of the change
+    coreEvents.emitLSPFileSaved(filePath);
   }
 
   /**
@@ -350,6 +846,7 @@ export class LSPService {
           childProcess.kill('SIGKILL');
         } finally {
           this.servers.delete(key);
+          this.openedFiles.clear();
         }
       };
       cleanupPromises.push(cleanup());

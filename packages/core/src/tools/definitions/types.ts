@@ -53,4 +53,10 @@ export interface CoreToolSet {
   lsp_references: FunctionDeclaration;
   lsp_implementation: FunctionDeclaration;
   lsp_symbols: FunctionDeclaration;
+  lsp_global_symbols: FunctionDeclaration;
+  lsp_type_definition: FunctionDeclaration;
+  lsp_hover: FunctionDeclaration;
+  lsp_rename: FunctionDeclaration;
+  lsp_fix: FunctionDeclaration;
+  lsp_capabilities: FunctionDeclaration;
 }

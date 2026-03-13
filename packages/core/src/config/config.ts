@@ -152,6 +152,12 @@ import {
   LSPReferencesTool,
   LSPSymbolsTool,
   LSPImplementationTool,
+  LSPGlobalSymbolsTool,
+  LSPTypeDefinitionTool,
+  LSPHoverTool,
+  LSPRenameTool,
+  LSPFixTool,
+  LSPCapabilitiesTool,
 } from '../tools/lspTools.js';
 import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
@@ -3026,6 +3032,24 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(LSPSymbolsTool, () =>
       registry.registerTool(new LSPSymbolsTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPGlobalSymbolsTool, () =>
+      registry.registerTool(new LSPGlobalSymbolsTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPTypeDefinitionTool, () =>
+      registry.registerTool(new LSPTypeDefinitionTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPHoverTool, () =>
+      registry.registerTool(new LSPHoverTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPRenameTool, () =>
+      registry.registerTool(new LSPRenameTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPFixTool, () =>
+      registry.registerTool(new LSPFixTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPCapabilitiesTool, () =>
+      registry.registerTool(new LSPCapabilitiesTool(this, this.messageBus)),
     );
 
     if (this.isTrackerEnabled()) {

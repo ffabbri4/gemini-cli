@@ -1,0 +1,2 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"functionCall":{"name":"lsp_symbols","args":{"file_path":"mockService.ts"}}}]},"finishReason":"STOP","index":0}]}]}
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"MockService CONSTANT_VAL"}]},"finishReason":"STOP","index":0}]}]}

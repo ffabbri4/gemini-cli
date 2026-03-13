@@ -50,6 +50,7 @@ import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { isGemini3Model } from '../config/models.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -316,6 +317,8 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       await this.config
         .getFileSystemService()
         .writeTextFile(this.resolvedPath, finalContent);
+
+      coreEvents.emitLSPFileSaved(this.resolvedPath);
 
       // Generate diff for display result
       const fileName = path.basename(this.resolvedPath);

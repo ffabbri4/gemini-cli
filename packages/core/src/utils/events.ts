@@ -190,6 +190,8 @@ export enum CoreEvent {
   EditorSelected = 'editor-selected',
   SlashCommandConflicts = 'slash-command-conflicts',
   QuotaChanged = 'quota-changed',
+  LSPFileChanged = 'lsp-file-changed',
+  LSPFileSaved = 'lsp-file-saved',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
 }
@@ -199,6 +201,21 @@ export enum CoreEvent {
  */
 export interface EditorSelectedPayload {
   editor?: EditorType;
+}
+
+/**
+ * Payload for the 'lsp-file-changed' event.
+ */
+export interface LSPFileChangedPayload {
+  filePath: string;
+  content: string;
+}
+
+/**
+ * Payload for the 'lsp-file-saved' event.
+ */
+export interface LSPFileSavedPayload {
+  filePath: string;
 }
 
 export interface CoreEvents extends ExtensionEvents {
@@ -223,6 +240,8 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
+  [CoreEvent.LSPFileChanged]: [LSPFileChangedPayload];
+  [CoreEvent.LSPFileSaved]: [LSPFileSavedPayload];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
 }
@@ -386,6 +405,16 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
     const payload: SlashCommandConflictsPayload = { conflicts };
     this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
+  }
+
+  emitLSPFileChanged(filePath: string, content: string): void {
+    const payload: LSPFileChangedPayload = { filePath, content };
+    this.emit(CoreEvent.LSPFileChanged, payload);
+  }
+
+  emitLSPFileSaved(filePath: string): void {
+    const payload: LSPFileSavedPayload = { filePath };
+    this.emit(CoreEvent.LSPFileSaved, payload);
   }
 
   /**

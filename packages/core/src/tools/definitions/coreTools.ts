@@ -18,12 +18,6 @@ import {
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from './dynamic-declaration-helpers.js';
-import {
-  LSP_DEFINITION_DEFINITION,
-  LSP_REFERENCES_DEFINITION,
-  LSP_SYMBOLS_DEFINITION,
-  LSP_IMPLEMENTATION_DEFINITION,
-} from '../lspTools.js';
 
 // Re-export names for compatibility
 export {
@@ -101,8 +95,15 @@ export {
   LSP_REFERENCES_TOOL_NAME,
   LSP_SYMBOLS_TOOL_NAME,
   LSP_IMPLEMENTATION_TOOL_NAME,
+  LSP_GLOBAL_SYMBOLS_TOOL_NAME,
+  LSP_TYPE_DEFINITION_TOOL_NAME,
+  LSP_HOVER_TOOL_NAME,
+  LSP_RENAME_TOOL_NAME,
+  LSP_FIX_TOOL_NAME,
+  LSP_CAPABILITIES_TOOL_NAME,
   LSP_PARAM_LINE,
   LSP_PARAM_CHARACTER,
+  LSP_PARAM_NEW_NAME,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -252,6 +253,48 @@ export const LSP_SYMBOLS_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.lsp_symbols;
   },
   overrides: (modelId) => getToolSet(modelId).lsp_symbols,
+};
+
+export const LSP_GLOBAL_SYMBOLS_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_global_symbols;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_global_symbols,
+};
+
+export const LSP_TYPE_DEFINITION_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_type_definition;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_type_definition,
+};
+
+export const LSP_HOVER_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_hover;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_hover,
+};
+
+export const LSP_RENAME_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_rename;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_rename,
+};
+
+export const LSP_FIX_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_fix;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_fix,
+};
+
+export const LSP_CAPABILITIES_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_capabilities;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_capabilities,
 };
 
 export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
