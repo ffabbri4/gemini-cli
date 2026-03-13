@@ -147,6 +147,12 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import {
+  LSPDefinitionTool,
+  LSPReferencesTool,
+  LSPSymbolsTool,
+  LSPImplementationTool,
+} from '../tools/lspTools.js';
 import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
@@ -3008,6 +3014,19 @@ export class Config implements McpContext, AgentLoopContext {
         registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
       );
     }
+
+    maybeRegister(LSPDefinitionTool, () =>
+      registry.registerTool(new LSPDefinitionTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPReferencesTool, () =>
+      registry.registerTool(new LSPReferencesTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPImplementationTool, () =>
+      registry.registerTool(new LSPImplementationTool(this, this.messageBus)),
+    );
+    maybeRegister(LSPSymbolsTool, () =>
+      registry.registerTool(new LSPSymbolsTool(this, this.messageBus)),
+    );
 
     if (this.isTrackerEnabled()) {
       maybeRegister(TrackerCreateTaskTool, () =>

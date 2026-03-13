@@ -49,4 +49,8 @@ export interface CoreToolSet {
   enter_plan_mode: FunctionDeclaration;
   exit_plan_mode: (plansDir: string) => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
+  lsp_definition: FunctionDeclaration;
+  lsp_references: FunctionDeclaration;
+  lsp_implementation: FunctionDeclaration;
+  lsp_symbols: FunctionDeclaration;
 }

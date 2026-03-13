@@ -122,3 +122,11 @@ export const EXIT_PLAN_PARAM_PLAN_PATH = 'plan_path';
 // -- enter_plan_mode --
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 export const PLAN_MODE_PARAM_REASON = 'reason';
+
+// -- lsp tools --
+export const LSP_DEFINITION_TOOL_NAME = 'lsp_definition';
+export const LSP_REFERENCES_TOOL_NAME = 'lsp_references';
+export const LSP_SYMBOLS_TOOL_NAME = 'lsp_symbols';
+export const LSP_IMPLEMENTATION_TOOL_NAME = 'lsp_implementation';
+export const LSP_PARAM_LINE = 'line';
+export const LSP_PARAM_CHARACTER = 'character';

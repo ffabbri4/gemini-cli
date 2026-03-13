@@ -18,6 +18,12 @@ import {
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from './dynamic-declaration-helpers.js';
+import {
+  LSP_DEFINITION_DEFINITION,
+  LSP_REFERENCES_DEFINITION,
+  LSP_SYMBOLS_DEFINITION,
+  LSP_IMPLEMENTATION_DEFINITION,
+} from '../lspTools.js';
 
 // Re-export names for compatibility
 export {
@@ -91,6 +97,12 @@ export {
   PLAN_MODE_PARAM_REASON,
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
+  LSP_DEFINITION_TOOL_NAME,
+  LSP_REFERENCES_TOOL_NAME,
+  LSP_SYMBOLS_TOOL_NAME,
+  LSP_IMPLEMENTATION_TOOL_NAME,
+  LSP_PARAM_LINE,
+  LSP_PARAM_CHARACTER,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -212,6 +224,34 @@ export const ASK_USER_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.ask_user;
   },
   overrides: (modelId) => getToolSet(modelId).ask_user,
+};
+
+export const LSP_DEFINITION_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_definition;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_definition,
+};
+
+export const LSP_REFERENCES_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_references;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_references,
+};
+
+export const LSP_IMPLEMENTATION_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_implementation;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_implementation,
+};
+
+export const LSP_SYMBOLS_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_symbols;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_symbols,
 };
 
 export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {

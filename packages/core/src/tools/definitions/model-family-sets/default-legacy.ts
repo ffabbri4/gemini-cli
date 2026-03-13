@@ -79,6 +79,12 @@ import {
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from '../dynamic-declaration-helpers.js';
+import {
+  LSP_DEFINITION_DEFINITION,
+  LSP_REFERENCES_DEFINITION,
+  LSP_SYMBOLS_DEFINITION,
+  LSP_IMPLEMENTATION_DEFINITION,
+} from '../lspTools.js';
 
 export const DEFAULT_LEGACY_SET: CoreToolSet = {
   read_file: {
@@ -734,4 +740,8 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+  lsp_definition: LSP_DEFINITION_DEFINITION.base,
+  lsp_references: LSP_REFERENCES_DEFINITION.base,
+  lsp_symbols: LSP_SYMBOLS_DEFINITION.base,
+  lsp_implementation: LSP_IMPLEMENTATION_DEFINITION.base,
 };

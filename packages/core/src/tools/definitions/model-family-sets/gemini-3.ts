@@ -80,6 +80,12 @@ import {
   getActivateSkillDeclaration,
 } from '../dynamic-declaration-helpers.js';
 import {
+  LSP_DEFINITION_DEFINITION,
+  LSP_REFERENCES_DEFINITION,
+  LSP_SYMBOLS_DEFINITION,
+  LSP_IMPLEMENTATION_DEFINITION,
+} from '../lspTools.js';
+import {
   DEFAULT_MAX_LINES_TEXT_FILE,
   MAX_LINE_LENGTH_TEXT_FILE,
   MAX_FILE_SIZE_MB,
@@ -709,4 +715,8 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+  lsp_definition: LSP_DEFINITION_DEFINITION.base,
+  lsp_references: LSP_REFERENCES_DEFINITION.base,
+  lsp_symbols: LSP_SYMBOLS_DEFINITION.base,
+  lsp_implementation: LSP_IMPLEMENTATION_DEFINITION.base,
 };
