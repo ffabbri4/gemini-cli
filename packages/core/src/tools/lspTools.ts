@@ -45,7 +45,7 @@ import { LSPService, isLSPWorkspaceEdit } from '../services/lspService.js';
 // --- Base LSP Invocation ---
 
 abstract class BaseLSPInvocation<
-  TParams extends { file_path?: string },
+  TParams extends { file_path?: string; language?: string },
 > extends BaseToolInvocation<TParams, ToolResult> {
   constructor(
     protected readonly config: Config,
@@ -60,8 +60,12 @@ abstract class BaseLSPInvocation<
     return LSPService.getInstance();
   }
 
+  protected get projectRoot(): string {
+    return this.config.getTargetDir();
+  }
+
   protected resolvePath(filePath: string): string {
-    return path.resolve(this.config.getTargetDir(), filePath);
+    return path.resolve(this.projectRoot, filePath);
   }
 
   protected getFileURL(filePath: string): string {
@@ -100,16 +104,15 @@ abstract class BaseLSPInvocation<
         fullPath,
         method,
         lspParams,
-        undefined,
+        this.projectRoot,
         this.params.language,
       );
 
       // Handle WorkspaceEdit if returned (mutation tools)
       if (isLSPWorkspaceEdit(result)) {
-        // Discover the project root for the edit application
-        const projectRoot = await this.lspService.findProjectRoot(fullPath);
+        // Use the configured project root for the edit application
         const editResult = await this.lspService.applyWorkspaceEdit(
-          projectRoot,
+          this.projectRoot,
           result,
         );
         if (!editResult.success) {

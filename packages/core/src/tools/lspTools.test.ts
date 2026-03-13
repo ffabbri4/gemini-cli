@@ -67,12 +67,13 @@ describe('LSP Tools Integration', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(lspServiceMock.sendRequest).toHaveBeenCalledWith(
-        expect.stringContaining('test.ts'),
+        '/mock/project/root/test.ts',
         'textDocument/definition',
         {
           textDocument: { uri: 'file:///mock/project/root/test.ts' },
           position: { line: 10, character: 5 },
         },
+        '/mock/project/root',
         undefined,
       );
       expect(result.returnDisplay).toBe('Found definition(s).');
@@ -110,11 +111,12 @@ describe('LSP Tools Integration', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(lspServiceMock.sendRequest).toHaveBeenCalledWith(
-        expect.stringContaining('test.ts'),
+        '/mock/project/root/test.ts',
         'textDocument/documentSymbol',
         {
           textDocument: { uri: 'file:///mock/project/root/test.ts' },
         },
+        '/mock/project/root',
         undefined,
       );
       expect(result.returnDisplay).toBe('Found symbol(s).');
@@ -134,11 +136,12 @@ describe('LSP Tools Integration', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(lspServiceMock.sendRequest).toHaveBeenCalledWith(
-        expect.stringContaining('test.ts'),
+        '/mock/project/root/test.ts',
         'textDocument/references',
         expect.objectContaining({
           context: { includeDeclaration: true },
         }),
+        '/mock/project/root',
         undefined,
       );
       expect(result.returnDisplay).toBe('Found reference(s).');
@@ -158,9 +161,10 @@ describe('LSP Tools Integration', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(lspServiceMock.sendRequest).toHaveBeenCalledWith(
-        expect.stringContaining('test.ts'),
+        '/mock/project/root/test.ts',
         'textDocument/implementation',
         expect.anything(),
+        '/mock/project/root',
         undefined,
       );
       expect(result.returnDisplay).toBe('Found implementation(s).');

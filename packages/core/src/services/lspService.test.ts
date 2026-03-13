@@ -137,14 +137,13 @@ describe('LSPService Singleton', () => {
     const instance2 = LSPService.getInstance();
     expect(instance1).toBe(instance2);
   });
-
-  it('identifies correct language IDs', () => {
+  it('identifies correct language IDs', async () => {
     const service = LSPService.getInstance();
-    expect(service.getLanguageId('test.ts')).toBe('typescript');
-    expect(service.getLanguageId('test.tsx')).toBe('typescript');
-    expect(service.getLanguageId('test.js')).toBe('javascript');
-    expect(service.getLanguageId('test.py')).toBe('python');
-    expect(service.getLanguageId('test.txt')).toBeUndefined();
+    expect(await service.getLanguageId('test.ts')).toBe('typescript');
+    expect(await service.getLanguageId('test.tsx')).toBe('typescript');
+    expect(await service.getLanguageId('test.js')).toBe('javascript');
+    expect(await service.getLanguageId('test.py')).toBe('python');
+    expect(await service.getLanguageId('test.txt')).toBeUndefined();
   });
 
   it('discovers the project root correctly', async () => {
