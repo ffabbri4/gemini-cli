@@ -143,7 +143,10 @@ export class CoreToolScheduler {
     const messageBus = this.config.getMessageBus();
 
     // Check if we've already subscribed a handler to this message bus
-    if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
+    if (
+      messageBus &&
+      !CoreToolScheduler.subscribedMessageBuses.has(messageBus)
+    ) {
       // Create a shared handler that will be used for this message bus
       const sharedHandler = (request: ToolConfirmationRequest) => {
         // When ASK_USER policy decision is made, respond with requiresUserConfirmation=true

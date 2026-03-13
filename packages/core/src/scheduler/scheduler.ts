@@ -168,10 +168,10 @@ export class Scheduler {
 
     // TODO: Optimize policy checks. Currently, tools check policy via
     // MessageBus even though the Scheduler already checked it.
-    messageBus.subscribe(
+    messageBus?.subscribe(
       MessageBusType.TOOL_CONFIRMATION_REQUEST,
       async (request: ToolConfirmationRequest) => {
-        await messageBus.publish({
+        await messageBus?.publish({
           type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           correlationId: request.correlationId,
           confirmed: false,

@@ -208,7 +208,7 @@ async function handleStandardPolicyUpdate(
       options.argsPattern = buildFilePathArgsPattern(filePath);
     }
 
-    await messageBus.publish({
+    await messageBus?.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: tool.name,
       persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
@@ -250,7 +250,7 @@ async function handleMcpPolicyUpdate(
     toolName = `${confirmationDetails.serverName}__*`;
   }
 
-  await messageBus.publish({
+  await messageBus?.publish({
     type: MessageBusType.UPDATE_POLICY,
     toolName,
     mcpName: confirmationDetails.serverName,
