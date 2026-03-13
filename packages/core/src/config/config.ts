@@ -159,6 +159,7 @@ import {
   LSPFixTool,
   LSPCapabilitiesTool,
 } from '../tools/lspTools.js';
+import { LSPService } from '../services/lspService.js';
 import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
@@ -3224,6 +3225,7 @@ export class Config implements McpContext, AgentLoopContext {
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
     }
+    await LSPService.getInstance().shutdown();
   }
 }
 // Export model constants for use in CLI

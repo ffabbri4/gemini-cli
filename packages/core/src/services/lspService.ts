@@ -404,10 +404,8 @@ export class LSPService {
   };
 
   private constructor() {
-    // Ensure cleanup on main process exit
-    process.on('exit', () => {
-      void this.shutdown();
-    });
+    // Cleanup is now handled gracefully via Config.dispose() asynchronously
+    // during the CLI's runExitCleanup() sequence.
 
     // Subscribe to file system events to keep LSP servers in sync
     coreEvents.on(CoreEvent.LSPFileChanged, (payload) => {
