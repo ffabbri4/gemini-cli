@@ -195,7 +195,7 @@ export abstract class BaseToolInvocation<
     ) {
       if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
-        void this.messageBus.publish({
+        void this.messageBus?.publish({
           type: MessageBusType.UPDATE_POLICY,
           toolName: this._toolName,
           persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
@@ -301,7 +301,7 @@ export abstract class BaseToolInvocation<
         resolve('ASK_USER'); // Default to ASK_USER on timeout
       }, 30000);
 
-      this.messageBus.subscribe(
+      this.messageBus?.subscribe(
         MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         responseHandler,
       );
@@ -313,7 +313,7 @@ export abstract class BaseToolInvocation<
       };
 
       try {
-        void this.messageBus.publish(request);
+        void this.messageBus?.publish(request);
       } catch (_error) {
         cleanup();
         resolve('ALLOW');
