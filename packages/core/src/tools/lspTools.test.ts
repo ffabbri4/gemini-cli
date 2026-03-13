@@ -15,18 +15,27 @@ import { LSPService } from '../services/lspService.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
-vi.mock('../services/lspService.js', () => ({
-  LSPService: {
-    getInstance: vi.fn().mockReturnValue({
-      sendRequest: vi.fn(),
-    }),
-  },
-}));
+vi.mock('../services/lspService.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../services/lspService.js')>();
+  return {
+    ...actual,
+    LSPService: {
+      getInstance: vi.fn().mockReturnValue({
+        sendRequest: vi.fn(),
+        findProjectRoot: vi.fn().mockResolvedValue('/mock/project/root'),
+      }),
+    },
+  };
+});
 
 describe('LSP Tools Integration', () => {
   let mockConfig: Config;
   let mockBus: MessageBus;
-  let lspServiceMock: { sendRequest: ReturnType<typeof vi.fn> };
+  let lspServiceMock: {
+    sendRequest: ReturnType<typeof vi.fn>;
+    findProjectRoot: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,6 +48,7 @@ describe('LSP Tools Integration', () => {
 
     lspServiceMock = LSPService.getInstance() as unknown as {
       sendRequest: ReturnType<typeof vi.fn>;
+      findProjectRoot: ReturnType<typeof vi.fn>;
     };
   });
 
@@ -57,13 +67,13 @@ describe('LSP Tools Integration', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(lspServiceMock.sendRequest).toHaveBeenCalledWith(
-        '/mock/project/root',
         expect.stringContaining('test.ts'),
         'textDocument/definition',
         {
           textDocument: { uri: 'file:///mock/project/root/test.ts' },
           position: { line: 10, character: 5 },
         },
+        undefined,
       );
       expect(result.returnDisplay).toBe('Found definition(s).');
       expect(result.llmContent).toContain('file:///mock/project/root/test.ts');
@@ -100,12 +110,12 @@ describe('LSP Tools Integration', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(lspServiceMock.sendRequest).toHaveBeenCalledWith(
-        '/mock/project/root',
         expect.stringContaining('test.ts'),
         'textDocument/documentSymbol',
         {
           textDocument: { uri: 'file:///mock/project/root/test.ts' },
         },
+        undefined,
       );
       expect(result.returnDisplay).toBe('Found symbol(s).');
     });
@@ -124,12 +134,12 @@ describe('LSP Tools Integration', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(lspServiceMock.sendRequest).toHaveBeenCalledWith(
-        '/mock/project/root',
         expect.stringContaining('test.ts'),
         'textDocument/references',
         expect.objectContaining({
           context: { includeDeclaration: true },
         }),
+        undefined,
       );
       expect(result.returnDisplay).toBe('Found reference(s).');
     });
@@ -148,10 +158,10 @@ describe('LSP Tools Integration', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(lspServiceMock.sendRequest).toHaveBeenCalledWith(
-        '/mock/project/root',
         expect.stringContaining('test.ts'),
         'textDocument/implementation',
         expect.anything(),
+        undefined,
       );
       expect(result.returnDisplay).toBe('Found implementation(s).');
     });

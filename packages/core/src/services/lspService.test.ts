@@ -146,4 +146,16 @@ describe('LSPService Singleton', () => {
     expect(service.getLanguageId('test.py')).toBe('python');
     expect(service.getLanguageId('test.txt')).toBeUndefined();
   });
+
+  it('discovers the project root correctly', async () => {
+    const service = LSPService.getInstance();
+    const currentFile = import.meta.filename;
+    const root = await service.findProjectRoot(currentFile);
+
+    // In this repo, the root should contain package.json
+    expect(root).toBeDefined();
+    expect(root.length).toBeGreaterThan(0);
+    // It should be an absolute path
+    expect(root.startsWith('/')).toBe(true);
+  });
 });

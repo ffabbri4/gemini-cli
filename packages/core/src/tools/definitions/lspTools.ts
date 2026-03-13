@@ -119,6 +119,16 @@ export const LSP_GLOBAL_SYMBOLS_DEFINITION: ToolDefinition = {
           type: 'string',
           description: 'The symbol name or pattern to search for.',
         },
+        [PARAM_FILE_PATH]: {
+          type: 'string',
+          description:
+            'Optional: A file path within the project to search. This helps pick the correct language server in a monorepo.',
+        },
+        language: {
+          type: 'string',
+          description:
+            "Optional: The language server to query (e.g., 'typescript', 'python'). If omitted, the system attempts to infer the language from the workspace markers.",
+        },
       },
       required: [PARAM_PATTERN],
     },

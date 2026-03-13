@@ -60,12 +60,8 @@ abstract class BaseLSPInvocation<
     return LSPService.getInstance();
   }
 
-  protected get projectRoot(): string {
-    return this.config.getTargetDir();
-  }
-
   protected resolvePath(filePath: string): string {
-    return path.resolve(this.projectRoot, filePath);
+    return path.resolve(this.config.getTargetDir(), filePath);
   }
 
   protected getFileURL(filePath: string): string {
@@ -91,21 +87,29 @@ abstract class BaseLSPInvocation<
     try {
       // For workspace-wide tools, we might not have a file_path in params
       // but LSPService.sendRequest requires a file_path to determine the language server.
-      // We use a dummy file in the root if not provided.
-      const filePath = this.params.file_path ?? 'index.ts';
+      // We try to find a real file in the workspace if none provided.
+      let filePath = this.params.file_path;
+      if (!filePath) {
+        // Fallback to current working directory to trigger discovery from the base
+        filePath = '.';
+      }
       const fullPath = this.resolvePath(filePath);
       const { method, lspParams } = this.getLSPRequest();
+
       const result = await this.lspService.sendRequest(
-        this.projectRoot,
         fullPath,
         method,
         lspParams,
+        undefined,
+        this.params.language,
       );
 
       // Handle WorkspaceEdit if returned (mutation tools)
       if (isLSPWorkspaceEdit(result)) {
+        // Discover the project root for the edit application
+        const projectRoot = await this.lspService.findProjectRoot(fullPath);
         const editResult = await this.lspService.applyWorkspaceEdit(
-          this.projectRoot,
+          projectRoot,
           result,
         );
         if (!editResult.success) {
@@ -388,6 +392,7 @@ export class LSPSymbolsTool extends BaseDeclarativeTool<
 interface LSPGlobalSymbolsParams {
   file_path?: string;
   pattern: string;
+  language?: string;
 }
 
 class LSPGlobalSymbolsInvocation extends BaseLSPInvocation<LSPGlobalSymbolsParams> {
@@ -702,19 +707,14 @@ class LSPCapabilitiesInvocation extends BaseLSPInvocation<LSPCapabilitiesParams>
   }
 
   protected getLSPRequest() {
-    // This is a special case, we don't actually send a request to the server
-    // but we use the existing sendRequest infrastructure if we wanted to.
-    // However, LSPService now has a getCapabilities method.
+    // Internal marker for capabilities query
     return { method: 'internal/capabilities', lspParams: {} };
   }
 
   override async execute(_signal: AbortSignal): Promise<ToolResult> {
     try {
       const fullPath = this.resolvePath(this.params.file_path);
-      const capabilities = await this.lspService.getCapabilities(
-        this.projectRoot,
-        fullPath,
-      );
+      const capabilities = await this.lspService.getCapabilities(fullPath);
       return {
         llmContent: JSON.stringify(capabilities, null, 2),
         returnDisplay: this.getSuccessDisplay(),

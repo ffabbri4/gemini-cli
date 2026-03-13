@@ -43,6 +43,9 @@ mutation.
    language server processes keyed by `(projectRoot, languageId)`.
 7. **Implicit Discovery:** The system will attempt to find language servers
    (e.g., `typescript-language-server`) in the user's `$PATH` by default.
+8. **Multi-Project Scoping:** Support targeted language server instantiation for
+   specific sub-projects or multiple worktrees via an optional `project_dir`
+   parameter on LSP tools, overriding the default workspace root.
 
 ## Consequences
 

@@ -416,9 +416,9 @@ export class LSPService {
         const [projectRoot] = key.split(':');
         if (payload.filePath.startsWith(projectRoot)) {
           void this.notifyFileChanged(
-            projectRoot,
             payload.filePath,
             payload.content,
+            projectRoot,
           );
           break;
         }
@@ -429,7 +429,7 @@ export class LSPService {
       for (const [key] of this.servers) {
         const [projectRoot] = key.split(':');
         if (payload.filePath.startsWith(projectRoot)) {
-          void this.notifyFileSaved(projectRoot, payload.filePath);
+          void this.notifyFileSaved(payload.filePath, projectRoot);
           break;
         }
       }
@@ -447,26 +447,85 @@ export class LSPService {
   }
 
   /**
-   * Resolves the appropriate language ID for a file path.
+   * Discovers the logical project root by walking up the directory tree.
+   * Looks for strong signals like package.json or .git.
    */
-  getLanguageId(filePath: string): string | undefined {
-    const ext = path.extname(filePath).toLowerCase();
-    switch (ext) {
-      case '.ts':
-      case '.tsx':
-        return 'typescript';
-      case '.js':
-      case '.jsx':
-        return 'javascript';
-      case '.py':
-        return 'python';
-      case '.go':
-        return 'go';
-      case '.rs':
-        return 'rust';
-      default:
-        return undefined;
+  async findProjectRoot(startPath: string): Promise<string> {
+    const markers = [
+      '.git',
+      'package.json',
+      'tsconfig.json',
+      'Cargo.toml',
+      'go.mod',
+      'pyproject.toml',
+      'compile_commands.json',
+    ];
+
+    // Ensure we start with a directory
+    const stat = await fs.stat(startPath).catch(() => null);
+    let currentDir = stat?.isDirectory() ? startPath : path.dirname(startPath);
+    const rootDir = path.parse(currentDir).root;
+
+    while (currentDir !== rootDir) {
+      for (const marker of markers) {
+        const markerPath = path.join(currentDir, marker);
+        try {
+          await fs.access(markerPath);
+          return currentDir; // Found a marker!
+        } catch {
+          // Marker not found in this directory, continue checking others
+        }
+      }
+      currentDir = path.dirname(currentDir);
     }
+
+    // Fallback: If we reach the file system root, return process.cwd()
+    // In the CLI context, this acts as the "global" target directory fallback.
+    return process.cwd();
+  }
+
+  /**
+   * Resolves the appropriate language ID for a file path.
+   * If the path is a directory, it attempts to infer the language from root markers.
+   */
+  async getLanguageId(filePath: string): Promise<string | undefined> {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.ts' || ext === '.tsx') return 'typescript';
+    if (ext === '.js' || ext === '.jsx') return 'javascript';
+    if (ext === '.py') return 'python';
+    if (ext === '.go') return 'go';
+    if (ext === '.rs') return 'rust';
+
+    if (ext === '') {
+      // It might be a directory or a file without extension.
+      // Check for common markers in the path or its parent.
+      try {
+        const stat = await fs.stat(filePath);
+        const dir = stat.isDirectory() ? filePath : path.dirname(filePath);
+
+        const checks = [
+          { marker: 'tsconfig.json', lang: 'typescript' },
+          { marker: 'package.json', lang: 'typescript' },
+          { marker: 'pyproject.toml', lang: 'python' },
+          { marker: 'requirements.txt', lang: 'python' },
+          { marker: 'go.mod', lang: 'go' },
+          { marker: 'Cargo.toml', lang: 'rust' },
+        ];
+
+        for (const check of checks) {
+          try {
+            await fs.access(path.join(dir, check.marker));
+            return check.lang;
+          } catch {
+            // continue
+          }
+        }
+      } catch {
+        return undefined;
+      }
+    }
+
+    return undefined;
   }
 
   /**
@@ -599,15 +658,18 @@ export class LSPService {
    * Returns the server capabilities for a given project and file.
    */
   async getCapabilities(
-    projectRoot: string,
     filePath: string,
+    explicitProjectRoot?: string,
   ): Promise<ServerCapabilities> {
-    const languageId = this.getLanguageId(filePath);
+    const languageId = await this.getLanguageId(filePath);
     if (!languageId) {
       throw new Error(
         `Unsupported file type for LSP: ${path.extname(filePath)}`,
       );
     }
+
+    const projectRoot =
+      explicitProjectRoot ?? (await this.findProjectRoot(filePath));
     const key = `${projectRoot}:${languageId}`;
     let server = this.servers.get(key);
     if (!server) {
@@ -624,13 +686,15 @@ export class LSPService {
    * Notifies the server that a file's content has changed in memory.
    */
   async notifyFileChanged(
-    projectRoot: string,
     filePath: string,
     content: string,
+    explicitProjectRoot?: string,
   ): Promise<void> {
-    const languageId = this.getLanguageId(filePath);
+    const languageId = await this.getLanguageId(filePath);
     if (!languageId) return;
 
+    const projectRoot =
+      explicitProjectRoot ?? (await this.findProjectRoot(filePath));
     const connection = await this.getOrCreateConnection(
       projectRoot,
       languageId,
@@ -665,10 +729,15 @@ export class LSPService {
   /**
    * Notifies the server that a file has been saved to disk.
    */
-  async notifyFileSaved(projectRoot: string, filePath: string): Promise<void> {
-    const languageId = this.getLanguageId(filePath);
+  async notifyFileSaved(
+    filePath: string,
+    explicitProjectRoot?: string,
+  ): Promise<void> {
+    const languageId = await this.getLanguageId(filePath);
     if (!languageId) return;
 
+    const projectRoot =
+      explicitProjectRoot ?? (await this.findProjectRoot(filePath));
     const connection = await this.getOrCreateConnection(
       projectRoot,
       languageId,
@@ -686,18 +755,22 @@ export class LSPService {
    * Executes an LSP request, handling coordinate normalization (1-indexed to 0-indexed).
    */
   async sendRequest(
-    projectRoot: string,
     filePath: string,
     method: string,
     params: unknown,
+    explicitProjectRoot?: string,
+    explicitLanguageId?: string,
   ): Promise<unknown> {
-    const languageId = this.getLanguageId(filePath);
+    const languageId =
+      explicitLanguageId ?? (await this.getLanguageId(filePath));
     if (!languageId) {
       throw new Error(
         `Unsupported file type for LSP: ${path.extname(filePath)}`,
       );
     }
 
+    const projectRoot =
+      explicitProjectRoot ?? (await this.findProjectRoot(filePath));
     const connection = await this.getOrCreateConnection(
       projectRoot,
       languageId,
